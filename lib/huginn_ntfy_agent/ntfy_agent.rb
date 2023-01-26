@@ -83,15 +83,15 @@ module Agents
     form_configurable :delay, type: :string
     form_configurable :actions, type: :string
     form_configurable :expected_receive_period_in_days, type: :string
-    form_configurable :type, type: :array, values: ['publish']
+    form_configurable :type, type: :array, values: ['publish', 'subscribe']
     def validate_options
-      errors.add(:base, "type has invalid value: should be 'publish'") if interpolated['type'].present? && !%w(publish).include?(interpolated['type'])
+      errors.add(:base, "type has invalid value: should be 'publish' 'subscribe'") if interpolated['type'].present? && !%w(publish subscribe).include?(interpolated['type'])
 
-      unless options['topic'].present? || !['publish'].include?(options['type'])
+      unless options['topic'].present? || !['publish' 'subscribe'].include?(options['type'])
         errors.add(:base, "topic is a required field")
       end
 
-      unless options['server'].present? || !['publish'].include?(options['type'])
+      unless options['server'].present? || !['publish' 'subscribe'].include?(options['type'])
         errors.add(:base, "server is a required field")
       end
 
@@ -142,6 +142,22 @@ module Agents
 
     end
 
+    def subscribe
+
+      uri = URI.parse("#{interpolated['server']}/#{interpolated['topic']}/json?since=10m&poll=1")
+      response = Net::HTTP.get_response(uri)
+
+      log_curl_output(response.code,response.body)
+
+      if !response.body.empty?
+        data_lines = response.body.split("\n")
+        data_lines.map do |line|
+          create_event payload: JSON.parse(line)
+        end
+      end
+
+    end
+
     def publish
 
       data = {}
@@ -176,6 +192,8 @@ module Agents
       case interpolated['type']
       when "publish"
         publish()
+      when "subscribe"
+        subscribe()
       else
         log "Error: type has an invalid value (#{type})"
       end
