@@ -176,7 +176,7 @@ module Agents
         log data
       end
 
-      url = URI.encode(interpolated['server'])
+      url = URI.parse(interpolated['server'])
       response = HTTParty.post(url, body: data.to_json)
 
       log_curl_output(response.code,response.body)
