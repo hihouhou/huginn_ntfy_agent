@@ -27,6 +27,8 @@ module Agents
       The `attach` is an URL of an attachment, see attach via URL
 
       The `delay` is Timestamp or duration for delayed delivery (30min, 9am).
+
+      The `token` is needed if auth is enabled.
       
       The `email` is an e-mail address for e-mail notifications
 
@@ -71,8 +73,7 @@ module Agents
     form_configurable :emit_events, type: :boolean
     form_configurable :debug, type: :boolean
     form_configurable :server, type: :string
-    form_configurable :user, type: :string
-    form_configurable :password, type: :string
+    form_configurable :token, type: :string
     form_configurable :topic, type: :string
     form_configurable :message, type: :string
     form_configurable :title, type: :string
@@ -145,7 +146,13 @@ module Agents
     def subscribe
 
       uri = URI.parse("#{interpolated['server']}/#{interpolated['topic']}/json?since=10m&poll=1")
-      response = Net::HTTP.get_response(uri)
+      headers = {}
+      headers["Authorization"] = "Bearer #{interpolated['token']}" if interpolated['token'].present?
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true if uri.scheme == 'https'
+      request = Net::HTTP::Get.new(uri.request_uri)
+      headers.each { |key, value| request[key] = value }
+      response = http.request(request)
 
       log_curl_output(response.code,response.body)
 
@@ -177,7 +184,9 @@ module Agents
       end
 
       url = URI.parse(interpolated['server'])
-      response = HTTParty.post(url, body: data.to_json)
+      headers = {}
+      headers["Authorization"] = "Bearer #{interpolated['token']}" if interpolated['token'].present?
+      response = HTTParty.post(url, body: data.to_json, headers: headers)
 
       log_curl_output(response.code,response.body)
 
